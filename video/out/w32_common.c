@@ -75,6 +75,37 @@ typedef enum MONITOR_DPI_TYPE {
 #define rect_w(r) ((r).right - (r).left)
 #define rect_h(r) ((r).bottom - (r).top)
 
+const uint16_t RUSSIAN_LOWER_CODE_POINTS[] = {
+    0x0439, 0x0446, 0x0443, 0x043A, 0x0435, 0x043D, 0x0433, 0x0448, 0x0449, 0x0437,
+    0x0445, 0x044A, 0x0444, 0x044B, 0x0432, 0x0430, 0x043F, 0x0440, 0x043E, 0x043B,
+    0x0434, 0x0436, 0x044D, 0x044F, 0x0447, 0x0441, 0x043C, 0x0438, 0x0442, 0x044C,
+    0x0431, 0x044E, 0x002E, 0x0451
+};
+
+const uint16_t RUSSIAN_UPPER_CODE_POINTS[] = {
+    0x0419, 0x0426, 0x0423, 0x041A, 0x0415, 0x041D, 0x0413, 0x0428, 0x0429, 0x0417,
+    0x0425, 0x042A, 0x0424, 0x042B, 0x0412, 0x0410, 0x041F, 0x0420, 0x041E, 0x041B,
+    0x0414, 0x0416, 0x042D, 0x042F, 0x0427, 0x0421, 0x041C, 0x0418, 0x0422, 0x042C,
+    0x0411, 0x042E, 0x002E, 0x0401
+};
+
+const uint16_t ENGLISH_LOWER_CODE_POINTS[] = {
+    0x0071, 0x0077, 0x0065, 0x0072, 0x0074, 0x0079, 0x0075, 0x0069, 0x006F, 0x0070,
+    0x005B, 0x005D, 0x0061, 0x0073, 0x0064, 0x0066, 0x0067, 0x0068, 0x006A, 0x006B,
+    0x006C, 0x003A, 0x0022, 0x007A, 0x0078, 0x0063, 0x0076, 0x0062, 0x006E, 0x006D,
+    0x002C, 0x002E, 0x002F, 0x0060
+};
+
+const uint16_t ENGLISH_UPPER_CODE_POINTS[] = {
+    0x0051, 0x0057, 0x0045, 0x0052, 0x0054, 0x0059, 0x0055, 0x0049, 0x004F, 0x0050,
+    0x005B, 0x005D, 0x0041, 0x0053, 0x0044, 0x0046, 0x0047, 0x0048, 0x004A, 0x004B,
+    0x004C, 0x003A, 0x0022, 0x005A, 0x0058, 0x0043, 0x0056, 0x0042, 0x004E, 0x004D,
+    0x002C, 0x002E, 0x002F, 0x0060
+};
+
+
+
+
 struct w32_api {
     HRESULT (WINAPI *pGetDpiForMonitor)(HMONITOR, MONITOR_DPI_TYPE, UINT*, UINT*);
     BOOL (WINAPI *pImmDisableIME)(DWORD);
@@ -359,6 +390,25 @@ static int to_unicode(UINT vkey, UINT scancode, const BYTE keys[256])
     return 0;
 }
 
+// Return appropriate english symbol from russian layout
+static int change_russian_layout_to_english(int unicode_letter)
+{
+    // Searching for letter in the lower letters array
+    for (int i = 0; i < 34; i++) {
+        if (unicode_letter == (int)RUSSIAN_LOWER_CODE_POINTS[i]) {
+            return (int)ENGLISH_LOWER_CODE_POINTS[i];
+        }
+    }
+    // Searching for letter in the upper letters array
+    for (int i = 0; i < 34; i++) {
+        if (unicode_letter == (int)RUSSIAN_UPPER_CODE_POINTS[i]) {
+            return (int)ENGLISH_UPPER_CODE_POINTS[i];
+        }
+    }
+
+    return 0; // Character was not found in the Russian layout.
+}
+
 static int decode_key(struct vo_w32_state *w32, UINT vkey, UINT scancode)
 {
     BYTE keys[256];
@@ -417,6 +467,8 @@ static void handle_key_down(struct vo_w32_state *w32, UINT vkey, UINT scancode)
     int mpkey = mp_w32_vkey_to_mpkey(vkey, scancode & KF_EXTENDED);
     if (!mpkey) {
         mpkey = decode_key(w32, vkey, scancode & (0xff | KF_EXTENDED));
+        if (mpkey >= 1040 && mpkey <= 1103)
+            mpkey = change_russian_layout_to_english(mpkey);
         if (!mpkey)
             return;
     }
